@@ -1,0 +1,114 @@
+version: "3.8"
+
+services:
+
+    mariadb:
+        container_name: mariadb
+        build:
+            context: ./requirements/mariadb
+            args:
+                DB_NAME: ${DB_NAME}
+                DB_USER_PASS: ${DB_USER_PASS}
+                DB_USER: ${DB_USER}
+                DB_ROOT_PASS: ${DB_ROOT_PASS}
+        image: mariadb
+        restart: always
+        volumes:
+            - db-data:/var/lib/mysql
+        networks:
+            - net
+
+    wordpress:
+        container_name: wordpress
+        depends_on:
+            - mariadb
+        build: ./requirements/wordpress
+        image: wordpress
+        restart: always
+        environment:
+            - DB_HOST=${DB_HOST}
+            - DB_USER=${DB_USER}
+            - DB_PASSWORD=${DB_PASSWORD}
+            - DB_NAME=${DB_NAME}
+        volumes:
+            - wordpress:/var/www/html/wordpress
+        networks:
+            - net
+
+    hugo:
+        container_name: hugo
+        build: ./requirements/bonus/hugo
+        image: hugo
+        volumes:
+            - ./requirements/bonus/hugo/tools/my-site:/var/www/html/my-site
+        networks:
+            - net
+
+    adminer:
+        container_name: adminer
+        build: ./requirements/bonus/adminer
+        image: adminer
+        depends_on:
+            - wordpress
+        volumes:
+            - wordpress:/var/www/html/wordpress
+        networks:
+            - net
+    
+    ftp:
+        container_name: ftp
+        build: ./requirements/bonus/ftp
+        image: ftp
+        depends_on:
+            - wordpress
+        volumes:
+            - wordpress:/ftp
+        ports:
+            - "21:21"
+            - "20:20"
+            - "21000-21000:21000-21000"
+        networks:
+            - net
+    
+    redis:
+        container_name: redis
+        build: ./requirements/bonus/redis
+        image: redis
+        ports:
+            - 6379:6379
+        networks:
+            - net
+
+    nginx:
+        container_name: nginx
+        depends_on:
+            - mariadb
+            - wordpress
+            - hugo
+            - adminer
+            - ftp
+            - redis
+        build:
+            context: ./requirements/nginx
+            args:
+                CERTS_K: ${CERTS_K}
+                CERTS_C: ${CERTS_C}
+        image: nginx
+        restart: always
+        ports:
+            - "10443:443"
+        volumes:
+            - wordpress:/var/www/html/wordpress
+        networks:
+            - net
+    
+volumes:
+    db-data:
+        name: db-data
+    wordpress:
+        name: wordpress
+
+networks:
+    net:
+        name: B.Lebowski
+        driver: bridge
